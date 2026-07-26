@@ -1,0 +1,5 @@
+técnica,accuracy,f1_macro,recall_Premium,recall_Económico
+Sin balanceo,0.861,0.846,0.842,0.733
+Class weights,0.86,0.844,0.832,0.726
+SMOTE,0.86,0.847,0.865,0.773
+Undersampling,0.817,0.811,0.927,0.844

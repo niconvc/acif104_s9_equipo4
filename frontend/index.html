@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tasador · Segmento de precio de vehículos</title>
+<style>
+  :root{
+    --ink:#0e1621; --panel:#152030; --panel-2:#1c2b3e; --line:#2a3c52;
+    --paper:#f5f7fa; --muted:#7d8ba0; --text:#e8eef6; --text-dk:#1a2534;
+    --amber:#f5a623; --eco:#2dd4a7; --medio:#f5a623; --premium:#c0468b;
+    --focus:#5fb0ff;
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code',Menlo,monospace;
+    --sans:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);background:var(--paper);color:var(--text-dk);}
+  /* ---- header: tablero ---- */
+  header{background:var(--ink);color:var(--text);padding:22px 0;
+    border-bottom:3px solid var(--amber);}
+  /* mismo contenedor que .wrap y footer: el titulo alinea con las tarjetas */
+  header>div{max-width:1080px;margin:0 auto;padding:0 20px;}
+  header h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.3px;}
+  header p{margin:2px 0 0;color:var(--muted);font-size:13px;}
+  .wrap{max-width:1080px;margin:24px auto;padding:0 20px;display:grid;
+    grid-template-columns:1.05fr .95fr;gap:22px;}
+  @media(max-width:860px){.wrap{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;
+    box-shadow:0 1px 3px rgba(16,22,33,.06);overflow:hidden;}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;
+    margin:0;padding:14px 18px;border-bottom:1px solid #eef2f7;color:#41566f;
+    font-weight:700;}
+  .card .body{padding:18px;}
+  /* ---- form ---- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+  label{font-size:12px;color:#5a6b82;font-weight:600;display:block;margin-bottom:4px;}
+  input,select{width:100%;padding:9px 10px;border:1px solid #cfd8e3;border-radius:7px;
+    font-size:14px;background:#fbfcfe;color:var(--text-dk);font-family:var(--sans);}
+  input:focus,select:focus{outline:2px solid var(--focus);border-color:var(--focus);}
+  .full{grid-column:1/-1;}
+  button{width:100%;margin-top:16px;padding:13px;border:none;border-radius:8px;
+    background:var(--ink);color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+    letter-spacing:.3px;transition:background .15s;}
+  button:hover{background:#1d3350;}
+  button:disabled{opacity:.6;cursor:progress;}
+  /* ---- resultado ---- */
+  .verdict{text-align:center;padding:20px;border-radius:10px;color:#fff;
+    margin-bottom:16px;transition:.25s;}
+  .verdict .seg{font-size:30px;font-weight:800;letter-spacing:.5px;}
+  .verdict .conf{font-size:13px;opacity:.9;margin-top:2px;}
+  .eco{background:linear-gradient(135deg,#12b98a,#2dd4a7);}
+  .medio{background:linear-gradient(135deg,#e0891a,#f5a623);}
+  .premium{background:linear-gradient(135deg,#9c2f74,#c0468b);}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px;}
+  /* ---- barras probabilidad ---- */
+  .bar-row{display:flex;align-items:center;gap:10px;margin:9px 0;}
+  .bar-row .name{width:82px;font-size:12px;font-weight:600;color:#41566f;}
+  .track{flex:1;height:16px;background:#eef2f7;border-radius:8px;overflow:hidden;}
+  .fill{height:100%;border-radius:8px;transition:width .5s;}
+  .bar-row .pct{width:46px;text-align:right;font-family:var(--mono);font-size:12px;}
+  /* ---- explicación ---- */
+  .why{margin-top:16px;}
+  .why h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#41566f;margin:0 0 8px;}
+  .why ul{margin:0;padding-left:0;list-style:none;}
+  .why li{font-size:13px;padding:7px 10px;background:#f5f8fc;border-left:3px solid var(--amber);
+    border-radius:4px;margin-bottom:6px;color:#334154;}
+  /* ---- monitoreo ---- */
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .metric{background:var(--panel);color:var(--text);border-radius:9px;padding:12px;text-align:center;}
+  .metric .n{font-size:22px;font-weight:800;font-family:var(--mono);color:var(--amber);}
+  .metric .l{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:3px;}
+  .mix{display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:8px;background:#eef2f7;}
+  .mix span{height:100%;}
+  footer{max-width:1080px;margin:8px auto 40px;padding:0 20px;color:var(--muted);font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Tasador de segmento · Vehículos usados</h1>
+    <p>Clasifica un auto en Económico · Medio · Premium según sus atributos</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Panel de entrada -->
+  <section class="card">
+    <h2>Datos del vehículo</h2>
+    <div class="body">
+      <div class="grid">
+        <div><label>Marca</label><select id="brand"></select></div>
+        <div><label>Carrocería</label><select id="type"></select></div>
+        <div><label>Año</label><input id="model_year" type="number" value="2015" min="1980" max="2019"></div>
+        <div><label>Odómetro (millas)</label><input id="odometer" type="number" value="90000" min="0" max="400000"></div>
+        <div><label>Cilindros</label><select id="cylinders"></select></div>
+        <div><label>Condición</label><select id="condition"></select></div>
+        <div><label>Combustible</label><select id="fuel"></select></div>
+        <div><label>Transmisión</label><select id="transmission"></select></div>
+        <div><label>Color</label><select id="paint_color"></select></div>
+        <div><label>Días publicado</label><input id="days_listed" type="number" value="30" min="0" max="300"></div>
+        <div class="full"><label>Tracción 4×4</label><select id="is_4wd"><option value="0">No</option><option value="1">Sí</option></select></div>
+      </div>
+      <button id="go" onclick="predict()">Clasificar segmento</button>
+    </div>
+  </section>
+
+  <!-- Panel de resultado -->
+  <section class="card">
+    <h2>Resultado</h2>
+    <div class="body" id="result">
+      <div class="empty">Ingresa los datos y presiona <b>Clasificar segmento</b>.</div>
+    </div>
+  </section>
+</div>
+
+<!-- Monitoreo -->
+<div class="wrap" style="grid-template-columns:1fr;margin-top:0">
+  <section class="card">
+    <h2>Monitoreo del modelo en producción</h2>
+    <div class="body">
+      <div class="metrics">
+        <div class="metric"><div class="n" id="m_total">0</div><div class="l">Predicciones</div></div>
+        <div class="metric"><div class="n" id="m_lat">—</div><div class="l">Latencia media (ms)</div></div>
+        <div class="metric"><div class="n" id="m_p95">—</div><div class="l">Latencia p95 (ms)</div></div>
+      </div>
+      <div class="mix" id="mix"></div>
+      <div id="mixlabels" style="font-size:12px;color:#5a6b82"></div>
+    </div>
+  </section>
+</div>
+
+<footer>Fase 2 — Modelo: Random Forest + SMOTE (F1-macro 0,85 en test) · Explicabilidad fundada en SHAP.</footer>
+
+<script>
+const OPTS = {
+  brand:["acura","bmw","buick","cadillac","chevrolet","chrysler","dodge","ford","gmc","honda","hyundai","jeep","kia","mercedes-benz","nissan","ram","subaru","toyota","volkswagen"],
+  type:["SUV","bus","convertible","coupe","hatchback","mini-van","offroad","other","pickup","sedan","truck","van","wagon"],
+  fuel:["gas","diesel","hybrid","electric","other"],
+  transmission:["automatic","manual","other"],
+  condition:["new","like new","excellent","good","fair","salvage"],
+  paint_color:["white","black","silver","grey","blue","red","green","brown","custom","orange","purple","yellow","unknown"],
+  // únicos valores presentes en vehicles_us.csv: el modelo nunca vio otros
+  cylinders:[3,4,5,6,8,10,12]
+};
+const SEG_CLASS={"Económico":"eco","Medio":"medio","Premium":"premium"};
+const SEG_COLOR={"Económico":"#2dd4a7","Medio":"#f5a623","Premium":"#c0468b"};
+for(const [id,vals] of Object.entries(OPTS)){
+  const sel=document.getElementById(id);
+  vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o);});
+}
+document.getElementById("type").value="SUV";
+document.getElementById("condition").value="good";
+document.getElementById("cylinders").value="6";
+
+async function predict(){
+  const btn=document.getElementById("go");btn.disabled=true;btn.textContent="Clasificando…";
+  const payload={
+    model_year:+model_year.value, odometer:+odometer.value, cylinders:+cylinders.value,
+    condition:condition.value, fuel:fuel.value, transmission:transmission.value,
+    type:type.value, paint_color:paint_color.value, brand:brand.value,
+    is_4wd:+is_4wd.value, days_listed:+days_listed.value
+  };
+  try{
+    const r=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(!r.ok){
+      // 422 = datos fuera del rango que el modelo conoce, no un fallo del servidor
+      const detalle=Array.isArray(d.detail)
+        ? d.detail.map(e=>`<li><b>${e.loc[e.loc.length-1]}</b>: ${e.msg} (recibido: ${e.input})</li>`).join("")
+        : `<li>${d.detail||"Respuesta inesperada del servidor."}</li>`;
+      document.getElementById("result").innerHTML=
+        `<div class="why"><h3>Datos fuera de rango</h3><ul>${detalle}</ul></div>`;
+      return;
+    }
+    renderResult(d);
+    refreshMetrics();
+  }catch(e){
+    document.getElementById("result").innerHTML='<div class="empty">No se pudo contactar al servidor. Revisa que uvicorn esté activo en el puerto 8000.</div>';
+  }finally{
+    btn.disabled=false;btn.textContent="Clasificar segmento";
+  }
+}
+
+function renderResult(d){
+  const conf=Math.max(...Object.values(d.probabilities))*100;
+  let bars="";
+  for(const [seg,p] of Object.entries(d.probabilities)){
+    bars+=`<div class="bar-row"><span class="name">${seg}</span>
+      <div class="track"><div class="fill" style="width:${(p*100).toFixed(1)}%;background:${SEG_COLOR[seg]}"></div></div>
+      <span class="pct">${(p*100).toFixed(1)}%</span></div>`;
+  }
+  const why=d.explanation.map(x=>`<li>${x}</li>`).join("");
+  document.getElementById("result").innerHTML=`
+    <div class="verdict ${SEG_CLASS[d.segment]}">
+      <div class="seg">${d.segment}</div>
+      <div class="conf">Confianza ${conf.toFixed(1)}% · respuesta en ${d.latency_ms} ms</div>
+    </div>
+    ${bars}
+    <div class="why"><h3>Por qué esta clasificación</h3><ul>${why}</ul></div>`;
+}
+
+async function refreshMetrics(){
+  try{
+    const d=await (await fetch("/metrics")).json();
+    m_total.textContent=d.total_predictions;
+    m_lat.textContent=d.avg_latency_ms??"—";
+    m_p95.textContent=d.p95_latency_ms??"—";
+    const dist=d.class_distribution||{}; const tot=Object.values(dist).reduce((a,b)=>a+b,0)||1;
+    let mix="",labels=[];
+    for(const seg of ["Económico","Medio","Premium"]){
+      const c=dist[seg]||0; const pc=(c/tot*100);
+      mix+=`<span style="width:${pc}%;background:${SEG_COLOR[seg]}"></span>`;
+      labels.push(`${seg}: ${c}`);
+    }
+    document.getElementById("mix").innerHTML=mix;
+    document.getElementById("mixlabels").textContent=labels.join("   ·   ");
+  }catch(e){}
+}
+refreshMetrics();
+</script>
+</body>
+</html>

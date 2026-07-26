@@ -1,0 +1,5 @@
+# Dependencias adicionales para reproducir src/train_dl.py
+# (las 3 arquitecturas de Deep Learning comparadas en el informe).
+# Incluye la base, asi que basta con:  pip install -r requirements-dl.txt
+-r requirements.txt
+tensorflow-cpu==2.21.0
