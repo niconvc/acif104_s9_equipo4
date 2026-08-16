@@ -1,0 +1,7 @@
+﻿n_estimators,max_depth,f1_macro,recall_premium,recall_economico,training_time_seconds,model_size_mb
+100,20,0.836,0.855,0.763,6.6,20.1
+100,Sin límite,0.846,0.835,0.732,8.8,28.4
+200,20,0.839,0.856,0.768,13.3,40.3
+200,Sin límite,0.846,0.837,0.729,15.9,56.7
+300,20,0.839,0.857,0.767,16.7,60.6
+300,Sin límite,0.846,0.835,0.727,21.3,85.2
