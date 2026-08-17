@@ -1,5 +1,24 @@
-__pycache__/
-*.pyc
+# Entorno virtual
+.venv/
 venv/
-.DS_Store
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+
+# Configuración local de PyCharm
+.idea/
+*.iml
+
+# Modelo final generado localmente
 models/*.joblib
+models/*.pkl
+
+# Archivos temporales
+*.tmp
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+Desktop.ini
