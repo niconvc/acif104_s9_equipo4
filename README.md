@@ -89,31 +89,25 @@ Las probabilidades entregadas por el clasificador no han sido sometidas a un pro
 car-price-segment/
 ├── backend/
 │   └── app.py
-│
 ├── data/
 │   └── vehicles_us.csv
-│
+├── docs/
+│   ├── acif104_s9_grupo4.pdf
+│   └── demostracion_sistema_funcional.mp4
 ├── frontend/
 │   └── index.html
-│
 ├── models/
-│   └── dl_histories.npy
-│
+│   └── final_model.joblib
 ├── reports/
 │   ├── figures/
 │   │   ├── Figura1_eda_overview.png
-│   │   ├── comparacion_modelos.png
 │   │   ├── confusion_matrix.png
-│   │   ├── convergencia_dl.png
-│   │   ├── efecto_balanceo.png
 │   │   ├── shap_global.png
-│   │   ├── shap_por_clase.png
-│   │   └── ui_prediccion.png
+│   │   └── shap_por_clase.png
 │   ├── balancing_results.csv
 │   ├── confusion_matrix.csv
 │   ├── final_model_results.csv
 │   └── rf_refinement_results.csv
-│
 ├── src/
 │   ├── balancing.py
 │   ├── eda.py
@@ -123,11 +117,10 @@ car-price-segment/
 │   ├── rf_refinement.py
 │   ├── train_dl.py
 │   └── train_ml.py
-│
 ├── .gitignore
-├── README.md
 ├── requirements.txt
-└── requirements-dl.txt
+├── requirements-dl.txt
+└── README.md
 ```
 
 El archivo `models/final_model.joblib` no se publica en GitHub debido a su tamaño. Se genera localmente mediante `src/final_model.py`.
@@ -413,10 +406,11 @@ http://127.0.0.1:8000
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/` | Presenta la interfaz web |
-| POST | `/predict` | Clasifica el vehículo y devuelve probabilidades estimadas y orientación heurística |
-| GET | `/metrics` | Informa uso, latencia, distribución de clases y predicciones recientes |
-| GET | `/health` | Informa el estado del servicio y del modelo |
+| `GET` | `/` | Muestra la interfaz web. |
+| `POST` | `/predict` | Predice el segmento y devuelve las probabilidades estimadas y la orientación heurística. |
+| `GET` | `/metrics` | Devuelve las métricas básicas de uso y latencia. |
+| `GET` | `/health` | Informa el estado del servicio y del modelo. |
+| `GET` | `/docs` | Muestra la documentación interactiva de FastAPI. |
 
 ## Ejemplo de solicitud
 
@@ -488,6 +482,31 @@ Monitoreo:
 ```text
 http://127.0.0.1:8000/metrics
 ```
+El endpoint `/metrics` registra durante la ejecución:
+
+- Número total de predicciones.
+- Distribución de predicciones por segmento.
+- Latencia media.
+- Latencia p95.
+- Predicciones recientes.
+
+Estas métricas se mantienen en memoria y se reinician al detener o reiniciar el servidor.
+
+## Documentación y demostración
+
+La carpeta [`docs/`](docs/) contiene los siguientes archivos:
+
+- [`acif104_s9_grupo4.pdf`](docs/acif104_s9_grupo4.pdf): informe final de la Sumativa 2, con la problemática, metodología, desarrollo, evaluación, limitaciones, propuestas de mejora y conclusiones del proyecto.
+- [`demostracion_sistema_funcional.mp4`](docs/demostracion_sistema_funcional.mp4): evidencia audiovisual de la operación del sistema.
+
+El video presenta:
+
+- El funcionamiento general de la interfaz.
+- Predicciones para los segmentos Económico, Medio y Premium.
+- Las probabilidades estimadas para cada clase.
+- Las orientaciones heurísticas.
+- La actualización del panel de monitoreo.
+- La validación de datos fuera de rango.
 
 ## Evidencias reproducibles
 
