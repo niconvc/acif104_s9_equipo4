@@ -7,6 +7,16 @@ utilizando los conjuntos de entrenamiento y validación.
 Posteriormente, evalúa el modelo sobre el conjunto de test, que no fue
 utilizado durante el entrenamiento ni la selección de hiperparámetros.
 
+Métricas generadas:
+
+    - Accuracy global.
+    - Precisión por segmento.
+    - Recall por segmento.
+    - F1-score por segmento.
+    - F1-macro.
+    - AUC multiclase One-vs-Rest con promedio macro.
+    - Matriz de confusión.
+
 Archivos generados:
 
     models/final_model.joblib
@@ -37,6 +47,7 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     f1_score,
+    roc_auc_score,
 )
 
 from preprocessing import SEG_LABELS
@@ -121,12 +132,18 @@ def build_final_pipeline():
 def build_results_table(
     y_true,
     predictions,
+    auc_ovr_macro,
 ):
     """
-    Construye la tabla de precisión, recall, F1-score y soporte.
+    Construye la tabla de precisión, recall, F1-score, soporte,
+    accuracy global y AUC-OVR macro.
 
-    La fila Global (macro) no presenta soporte, porque corresponde
+    La fila Global (macro) no presenta soporte porque corresponde
     al promedio no ponderado de las métricas de las tres clases.
+
+    El AUC se informa como una métrica global con promedio macro,
+    por lo que las filas individuales de los segmentos mantienen
+    esta columna vacía.
     """
 
     report = classification_report(
@@ -167,6 +184,7 @@ def build_results_table(
                 segment_result["support"]
             ),
             "accuracy_global": "",
+            "auc_ovr_macro": "",
         })
 
     macro_result = report[
@@ -190,6 +208,10 @@ def build_results_table(
         "soporte": "",
         "accuracy_global": round(
             accuracy,
+            3,
+        ),
+        "auc_ovr_macro": round(
+            auc_ovr_macro,
             3,
         ),
     })
@@ -312,7 +334,7 @@ def save_results(
     confusion_table,
 ):
     """
-    Guarda las métricas, matriz de confusión y figura.
+    Guarda las métricas, la matriz de confusión y su figura.
     """
 
     REPORTS_DIR.mkdir(
@@ -350,7 +372,7 @@ def save_model(
     Guarda el pipeline completo con compresión.
 
     La compresión reduce el tamaño del archivo sin modificar
-    predicciones ni métricas.
+    las predicciones ni las métricas.
     """
 
     MODELS_DIR.mkdir(
@@ -472,9 +494,21 @@ def main():
         y_full,
     )
 
+    # -----------------------------------------------------
+    # Predicciones y probabilidades sobre test
+    # -----------------------------------------------------
+
     predictions = pipeline.predict(
         X_test
     )
+
+    probabilities = pipeline.predict_proba(
+        X_test
+    )
+
+    # -----------------------------------------------------
+    # Métricas globales
+    # -----------------------------------------------------
 
     accuracy = accuracy_score(
         y_test,
@@ -487,9 +521,27 @@ def main():
         average="macro",
     )
 
+    # AUC multiclase One-vs-Rest.
+    #
+    # Cada segmento se compara contra los otros dos y luego
+    # se calcula el promedio macro, asignando el mismo peso
+    # a Económico, Medio y Premium.
+    auc_ovr_macro = roc_auc_score(
+        y_test,
+        probabilities,
+        labels=pipeline.classes_,
+        multi_class="ovr",
+        average="macro",
+    )
+
+    # -----------------------------------------------------
+    # Tablas de resultados
+    # -----------------------------------------------------
+
     results_table = build_results_table(
         y_test,
         predictions,
+        auc_ovr_macro,
     )
 
     confusion_table = build_confusion_table(
@@ -497,21 +549,30 @@ def main():
         predictions,
     )
 
+    # -----------------------------------------------------
+    # Resultados en consola
+    # -----------------------------------------------------
+
     print()
     print("=" * 65)
     print("EVALUACIÓN FINAL SOBRE TEST")
     print("=" * 65)
 
     print(
-        f"Accuracy:  {accuracy:.3f}"
+        f"Accuracy:       {accuracy:.3f}"
     )
 
     print(
-        f"F1-macro:  {f1_macro:.3f}"
+        f"F1-macro:       {f1_macro:.3f}"
+    )
+
+    print(
+        f"AUC-OVR macro:  {auc_ovr_macro:.3f}"
     )
 
     print()
     print("Resultados por segmento:")
+
     print(
         results_table.to_string(
             index=False
@@ -528,6 +589,10 @@ def main():
         confusion_table.to_string()
     )
 
+    # -----------------------------------------------------
+    # Guardado de evidencias
+    # -----------------------------------------------------
+
     save_results(
         results_table,
         confusion_table,
@@ -542,6 +607,10 @@ def main():
     model_size_mb = format_file_size_mb(
         MODEL_PATH
     )
+
+    # -----------------------------------------------------
+    # Resumen de archivos generados
+    # -----------------------------------------------------
 
     print()
     print("=" * 65)

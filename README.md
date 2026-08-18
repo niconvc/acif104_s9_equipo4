@@ -32,17 +32,19 @@ Después del proceso de limpieza, el conjunto utilizado para el modelado contien
 | Premium | 8.665 | 17,2 % |
 | **Total** | **50.267** | **100,0 %** |
 
-Esta distribución presenta un desbalance relevante, principalmente por el predominio de la clase Medio. Por esta razón, la métrica principal del proyecto es el **F1-macro**, complementada con accuracy, precisión y recall por clase.
+Esta distribución presenta un desbalance relevante, principalmente por el predominio de la clase Medio. Por esta razón, la métrica principal del proyecto es el **F1-macro**, complementada con accuracy, precisión, recall por clase y AUC multiclase One-vs-Rest con promedio macro.
 
 ## Resultado del modelo final
 
 El modelo seleccionado es un pipeline compuesto por:
 
-1. Preprocesamiento numérico y categórico.
-2. Balanceo mediante SMOTE.
+1. Preprocesamiento de variables numéricas y categóricas.
+2. Balanceo de clases mediante SMOTE.
 3. Clasificación mediante Random Forest de 200 árboles.
 
-El modelo se entrenó con los conjuntos de entrenamiento y validación y se evaluó sobre **7.541 vehículos de test no utilizados durante el entrenamiento**.
+El modelo se entrenó utilizando los conjuntos de entrenamiento y validación y posteriormente se evaluó sobre **7.541 vehículos del conjunto de test**, los cuales no fueron utilizados durante el entrenamiento, la validación ni la selección de hiperparámetros.
+
+### Resultados por segmento
 
 | Segmento | Precisión | Recall | F1-score | Soporte |
 |---|---:|---:|---:|---:|
@@ -51,14 +53,27 @@ El modelo se entrenó con los conjuntos de entrenamiento y validación y se eval
 | Premium | 0,868 | 0,872 | 0,870 | 1.300 |
 | Global (macro) | 0,847 | 0,845 | 0,846 | — |
 
-Resultados globales:
+### Resultados globales
 
 - **Accuracy:** 0,858.
 - **F1-macro:** 0,846.
+- **AUC-OVR macro:** 0,953.
 - **Casos de test:** 7.541.
 - **Tamaño comprimido del modelo:** aproximadamente 63,1 MB.
 
-Las métricas internas corresponden al dataset analizado y no garantizan el mismo desempeño en otros mercados, periodos o fuentes de datos.
+El AUC-OVR macro de 0,953 evidencia una alta capacidad del modelo para discriminar cada segmento frente a los restantes mediante las probabilidades estimadas. Sin embargo, las probabilidades no han sido sometidas a un procedimiento específico de calibración, por lo que deben interpretarse como estimaciones orientativas y no como niveles de confianza perfectamente calibrados.
+
+Las métricas corresponden al dataset y al mercado analizado, por lo que no garantizan el mismo desempeño en otros países, periodos, plataformas o fuentes de información.
+
+## Matriz de confusión
+
+| Segmento real | Económico | Medio | Premium |
+|---|---:|---:|---:|
+| Económico | 1.375 | 381 | 6 |
+| Medio | 350 | 3.962 | 167 |
+| Premium | 3 | 164 | 1.133 |
+
+La mayoría de los errores ocurre entre segmentos vecinos. Las confusiones extremas entre Económico y Premium suman nueve casos al considerar ambas direcciones.
 
 ## Explicabilidad y alcance
 
@@ -68,42 +83,45 @@ Las variables globalmente más relevantes incluyen:
 
 - Año del modelo.
 - Antigüedad.
-- Odómetro.
+- Kilometraje.
 - Tracción 4×4.
 - Cantidad de cilindros.
 - Tipo de carrocería.
 
-`model_year` y `age` contienen información redundante, debido a que:
+Las variables `model_year` y `age` contienen información redundante, debido a que:
 
 ```text
 age = 2019 - model_year
 ```
 
-La aplicación web no calcula SHAP por instancia. La interfaz presenta una **orientación heurística** basada en variables relevantes identificadas mediante el análisis exploratorio y SHAP global.
-
-Las probabilidades entregadas por el clasificador no han sido sometidas a un procedimiento específico de calibración, por lo que deben considerarse estimaciones orientativas y no niveles de confianza perfectamente calibrados.
+La aplicación web no calcula SHAP por instancia. La interfaz presenta una **orientación heurística** basada en variables relevantes identificadas mediante el análisis exploratorio y el análisis SHAP global. Estas orientaciones no corresponden a atribuciones locales del clasificador.
 
 ## Estructura del repositorio
 
 ```text
-car-price-segment/
+acif104_s9_equipo4/
 ├── backend/
 │   └── app.py
 ├── data/
 │   └── vehicles_us.csv
 ├── docs/
-│   ├── acif104_s9_grupo4.pdf
+│   ├── acif104_s9_equipo4.pdf
 │   └── demostracion_sistema_funcional.mp4
 ├── frontend/
 │   └── index.html
 ├── models/
-│   └── final_model.joblib
+│   ├── dl_histories.npy
+│   └── final_model.joblib          # Generado localmente
 ├── reports/
 │   ├── figures/
 │   │   ├── Figura1_eda_overview.png
+│   │   ├── comparacion_modelos.png
 │   │   ├── confusion_matrix.png
+│   │   ├── convergencia_dl.png
+│   │   ├── efecto_balanceo.png
 │   │   ├── shap_global.png
-│   │   └── shap_por_clase.png
+│   │   ├── shap_por_clase.png
+│   │   └── ui_prediccion.png
 │   ├── balancing_results.csv
 │   ├── confusion_matrix.csv
 │   ├── final_model_results.csv
@@ -118,25 +136,27 @@ car-price-segment/
 │   ├── train_dl.py
 │   └── train_ml.py
 ├── .gitignore
+├── README.md
 ├── requirements.txt
-├── requirements-dl.txt
-└── README.md
+└── requirements-dl.txt
 ```
 
-El archivo `models/final_model.joblib` no se publica en GitHub debido a su tamaño. Se genera localmente mediante `src/final_model.py`.
+El archivo `models/final_model.joblib` no se publica en GitHub debido a su tamaño. Este archivo se genera localmente mediante `src/final_model.py`.
 
 ## Responsabilidad de cada script
 
 | Archivo | Descripción |
 |---|---|
-| `preprocessing.py` | Limpieza, imputación, ingeniería de características y construcción del target |
+| `preprocessing.py` | Limpieza, imputación, ingeniería de características y construcción de la variable objetivo |
+| `eda.py` | Análisis exploratorio reproducible y generación de la Figura 1 |
 | `train_ml.py` | Comparación de Regresión Logística, Random Forest y XGBoost |
 | `train_dl.py` | Entrenamiento de tres arquitecturas MLP |
 | `balancing.py` | Comparación de datos sin balanceo, class weights, SMOTE y submuestreo |
 | `rf_refinement.py` | Barrido de cantidad de árboles y profundidad del Random Forest |
-| `final_model.py` | Entrenamiento, evaluación, serialización y generación de evidencias finales |
+| `final_model.py` | Entrenamiento y evaluación final; genera precisión, recall, F1-score, accuracy, AUC-OVR macro, matriz de confusión y modelo serializado |
 | `explain.py` | Análisis SHAP global sobre un Random Forest sustituto |
-| `eda.py` | Generación reproducible de la Figura 1 del análisis exploratorio |
+| `backend/app.py` | API FastAPI para predicción, validación, monitoreo y orientación heurística |
+| `frontend/index.html` | Interfaz web para ingresar datos, visualizar predicciones y consultar métricas |
 
 ## Requisitos
 
@@ -147,34 +167,26 @@ El archivo `models/final_model.joblib` no se publica en GitHub debido a su tama�
 - `pip` actualizado.
 - Memoria suficiente para entrenar Random Forest y aplicar SMOTE.
 
-Las dependencias principales están declaradas en:
-
-```text
-requirements.txt
-```
+Las dependencias principales están declaradas en `requirements.txt`.
 
 ### Deep Learning
 
-Para ejecutar `src/train_dl.py` se requiere TensorFlow. Las dependencias adicionales están declaradas en:
+Para ejecutar `src/train_dl.py` se requiere TensorFlow. Las dependencias adicionales están declaradas en `requirements-dl.txt`.
 
-```text
-requirements-dl.txt
-```
-
-En Windows se recomienda Python 3.12 para mantener compatibilidad con TensorFlow.
+En Windows se recomienda utilizar Python 3.12 para mantener compatibilidad con TensorFlow.
 
 ## Instalación
 
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/niconvc/car-price-segment.git
-cd car-price-segment
+git clone https://github.com/niconvc/acif104_s9_equipo4.git
+cd acif104_s9_equipo4
 ```
 
 ### 2. Crear el entorno virtual
 
-En Windows PowerShell:
+#### Windows PowerShell
 
 ```powershell
 py -3.12 -m venv .venv
@@ -188,7 +200,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-En Linux o macOS:
+#### Linux o macOS
 
 ```bash
 python3.12 -m venv .venv
@@ -209,13 +221,13 @@ python -m pip install -r requirements.txt
 
 ### 5. Instalar las dependencias de Deep Learning
 
-Este paso solo es necesario para ejecutar `train_dl.py`:
+Este paso solo es necesario para ejecutar `src/train_dl.py`:
 
 ```bash
 python -m pip install -r requirements-dl.txt
 ```
 
-`requirements-dl.txt` incluye las dependencias principales y TensorFlow:
+El archivo `requirements-dl.txt` incluye las dependencias principales y TensorFlow:
 
 ```text
 -r requirements.txt
@@ -227,7 +239,7 @@ tensorflow==2.21.0
 Todos los comandos deben ejecutarse desde la carpeta raíz del repositorio:
 
 ```text
-car-price-segment/
+acif104_s9_equipo4/
 ```
 
 ### 1. Verificar el preprocesamiento
@@ -259,12 +271,6 @@ Archivo generado:
 reports/figures/Figura1_eda_overview.png
 ```
 
-La figura utiliza:
-
-- Verde para Económico.
-- Naranja para Medio.
-- Rojo para Premium.
-
 ### 3. Comparar modelos tradicionales
 
 ```bash
@@ -279,7 +285,7 @@ Modelos evaluados:
 
 ### 4. Comparar arquitecturas neuronales
 
-Requiere las dependencias de `requirements-dl.txt`:
+Este paso requiere las dependencias de `requirements-dl.txt`:
 
 ```bash
 python src/train_dl.py
@@ -291,7 +297,7 @@ Arquitecturas evaluadas:
 - MLP Profunda.
 - MLP con embeddings.
 
-Cada entrenamiento utiliza una instancia independiente de `EarlyStopping`.
+Cada entrenamiento utiliza una instancia independiente de `EarlyStopping`, evitando que el callback conserve información de una red anterior.
 
 ### 5. Evaluar técnicas de balanceo
 
@@ -327,16 +333,10 @@ reports/rf_refinement_results.csv
 Configuraciones evaluadas:
 
 - 100, 200 y 300 árboles.
-- Profundidad máxima 20.
+- Profundidad máxima de 20.
 - Profundidad sin límite.
 
-El script registra:
-
-- F1-macro.
-- Recall Premium.
-- Recall Económico.
-- Tiempo de entrenamiento.
-- Tamaño serializado.
+El script registra F1-macro, recall Premium, recall Económico, tiempo de entrenamiento y tamaño serializado.
 
 ### 7. Entrenar y evaluar el modelo final
 
@@ -353,7 +353,17 @@ reports/confusion_matrix.csv
 reports/figures/confusion_matrix.png
 ```
 
-El modelo serializado utiliza compresión Joblib para reducir el tamaño del archivo.
+Salida esperada de métricas globales:
+
+```text
+Accuracy:       0.858
+F1-macro:       0.846
+AUC-OVR macro:  0.953
+```
+
+El archivo `reports/final_model_results.csv` contiene precisión, recall, F1-score, soporte, accuracy global y AUC-OVR macro.
+
+El modelo serializado utiliza compresión Joblib para reducir su tamaño aproximado desde 374 MB hasta 63,1 MB, sin modificar sus predicciones ni métricas.
 
 ### 8. Generar el análisis SHAP
 
@@ -378,13 +388,13 @@ Antes de iniciar la aplicación debe existir:
 models/final_model.joblib
 ```
 
-Si el archivo no existe, ejecútalo desde la raíz:
+Si el archivo no existe, debe generarse desde la raíz:
 
 ```bash
 python src/final_model.py
 ```
 
-Después inicia FastAPI con Uvicorn:
+Después, inicia FastAPI con Uvicorn:
 
 ```bash
 python -m uvicorn backend.app:app
@@ -406,11 +416,11 @@ http://127.0.0.1:8000
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/` | Muestra la interfaz web. |
-| `POST` | `/predict` | Predice el segmento y devuelve las probabilidades estimadas y la orientación heurística. |
-| `GET` | `/metrics` | Devuelve las métricas básicas de uso y latencia. |
-| `GET` | `/health` | Informa el estado del servicio y del modelo. |
-| `GET` | `/docs` | Muestra la documentación interactiva de FastAPI. |
+| `GET` | `/` | Muestra la interfaz web |
+| `POST` | `/predict` | Predice el segmento y devuelve probabilidades estimadas y orientación heurística |
+| `GET` | `/metrics` | Devuelve métricas básicas de uso, distribución y latencia |
+| `GET` | `/health` | Informa el estado del servicio y del modelo |
+| `GET` | `/docs` | Muestra la documentación interactiva de FastAPI |
 
 ## Ejemplo de solicitud
 
@@ -455,7 +465,7 @@ Los valores de probabilidad y latencia pueden variar entre ejecuciones y equipos
 
 ## Verificación del servicio
 
-Estado de la API:
+### Estado de la API
 
 ```text
 http://127.0.0.1:8000/health
@@ -477,11 +487,12 @@ Respuesta esperada:
 }
 ```
 
-Monitoreo:
+### Monitoreo
 
 ```text
 http://127.0.0.1:8000/metrics
 ```
+
 El endpoint `/metrics` registra durante la ejecución:
 
 - Número total de predicciones.
@@ -496,8 +507,8 @@ Estas métricas se mantienen en memoria y se reinician al detener o reiniciar el
 
 La carpeta [`docs/`](docs/) contiene los siguientes archivos:
 
-- [`acif104_s9_grupo4.pdf`](docs/acif104_s9_grupo4.pdf): informe final de la Sumativa 2, con la problemática, metodología, desarrollo, evaluación, limitaciones, propuestas de mejora y conclusiones del proyecto.
-- [`demostracion_sistema_funcional.mp4`](docs/demostracion_sistema_funcional.mp4): evidencia audiovisual de la operación del sistema.
+- [`acif104_s9_equipo4.pdf`](docs/acif104_s9_equipo4.pdf): informe final de la Sumativa 2.
+- [`demostracion_sistema_funcional.mp4`](docs/demostracion_sistema_funcional.mp4): evidencia audiovisual de la operación del sistema web.
 
 El video presenta:
 
@@ -517,22 +528,27 @@ El video presenta:
 | Convergencia de redes neuronales | `reports/figures/convergencia_dl.png` |
 | Efecto del balanceo | `reports/figures/efecto_balanceo.png` |
 | Barrido de Random Forest | `reports/rf_refinement_results.csv` |
-| Resultados del modelo final | `reports/final_model_results.csv` |
-| Matriz de confusión | `reports/confusion_matrix.csv` |
+| Métricas finales, incluida AUC-OVR macro | `reports/final_model_results.csv` |
+| Matriz de confusión en CSV | `reports/confusion_matrix.csv` |
 | Figura de matriz de confusión | `reports/figures/confusion_matrix.png` |
 | SHAP global | `reports/figures/shap_global.png` |
 | SHAP por clase | `reports/figures/shap_por_clase.png` |
 | Interfaz web | `reports/figures/ui_prediccion.png` |
+| Demostración audiovisual | `docs/demostracion_sistema_funcional.mp4` |
+| Informe final | `docs/acif104_s9_equipo4.pdf` |
 
-## Consideraciones
+## Consideraciones y limitaciones
 
-- El dataset corresponde al mercado estadounidense y a un periodo comprendido entre 2018 y 2019.
+- El dataset corresponde al mercado estadounidense y a publicaciones realizadas entre 2018 y 2019.
 - Los umbrales de USD 5.000 y USD 20.000 son fijos y no se ajustan automáticamente por inflación.
 - Las probabilidades del Random Forest no han sido calibradas.
+- Un AUC elevado indica una alta capacidad de discriminación, pero no garantiza que las probabilidades estén correctamente calibradas.
 - El análisis SHAP utiliza un modelo sustituto y no exactamente el pipeline utilizado por la API.
-- La interfaz entrega reglas descriptivas, no atribuciones SHAP locales.
+- La interfaz entrega reglas descriptivas y no atribuciones SHAP locales.
 - `model_year` y `age` contienen información redundante.
-- Los resultados pueden variar ligeramente entre versiones de Python y de las bibliotecas.
+- La comparación inicial no utiliza el mismo mecanismo de balanceo para todas las técnicas.
+- Los tiempos de entrenamiento de las arquitecturas neuronales no fueron instrumentados.
+- Los resultados pueden variar ligeramente entre versiones de Python, sistemas operativos y bibliotecas.
 
 ## Archivos excluidos de Git
 
@@ -540,11 +556,18 @@ El archivo `.gitignore` excluye:
 
 ```text
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 .idea/
+*.iml
 models/*.joblib
 models/*.pkl
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+Desktop.ini
 ```
 
 El modelo final debe regenerarse localmente mediante:
@@ -555,4 +578,4 @@ python src/final_model.py
 
 ## Repositorio
 
-[https://github.com/niconvc/car-price-segment](https://github.com/niconvc/car-price-segment)
+[https://github.com/niconvc/acif104_s9_equipo4](https://github.com/niconvc/acif104_s9_equipo4)
