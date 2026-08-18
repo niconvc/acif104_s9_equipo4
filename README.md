@@ -555,4 +555,4 @@ python src/final_model.py
 
 ## Repositorio
 
-[https://github.com/niconvc/car-price-segment](https://github.com/niconvc/car-price-segment)
+[https://github.com/niconvc/acif104_s9_grupo4](https://github.com/niconvc/acif104_s9_grupo4)
