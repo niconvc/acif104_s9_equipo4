@@ -10,10 +10,11 @@ Endpoints:
     GET  /metrics  -> entrega métricas básicas de monitoreo.
     GET  /health   -> informa el estado del servicio.
 
-La explicación entregada por la aplicación es heurística. Utiliza reglas
-descriptivas construidas a partir de variables relevantes identificadas
-durante el EDA y el análisis SHAP global. No corresponde a una atribución
-SHAP local de cada predicción.
+La explicación entregada por la aplicación corresponde a una atribución
+SHAP LOCAL calculada sobre el mismo Random Forest final que produce la
+predicción (no un modelo sustituto). Cada respuesta de /predict incluye
+las variables que más empujaron esa predicción específica, en la
+dirección observada para la clase predicha.
 
 Ejecución desde la raíz del proyecto:
 
@@ -29,6 +30,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+import shap
 
 from fastapi import FastAPI
 from fastapi.responses import (
@@ -70,7 +72,7 @@ app = FastAPI(
         "API para clasificar vehículos en los segmentos "
         "Económico, Medio o Premium."
     ),
-    version="1.1.0",
+    version="1.2.0",
 )
 
 
@@ -89,6 +91,20 @@ if not MODEL_PATH.exists():
 model = joblib.load(
     MODEL_PATH
 )
+
+# ---------------------------------------------------------
+# Explicador SHAP (construido una sola vez sobre el clasificador
+# final, para no reconstruir el árbol de decisiones en cada
+# solicitud de predicción).
+# ---------------------------------------------------------
+
+_PREPROCESSOR = model.named_steps["preprocessor"]
+_CLASSIFIER = model.named_steps["classifier"]
+_FEATURE_NAMES = (
+    _PREPROCESSOR.named_transformers_["num"].feature_names_in_.tolist()
+    + _PREPROCESSOR.named_transformers_["cat"].get_feature_names_out().tolist()
+)
+_EXPLAINER = shap.TreeExplainer(_CLASSIFIER)
 
 
 # ---------------------------------------------------------
@@ -227,79 +243,75 @@ def to_features(vehicle: Vehicle) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------
-# Orientación heurística
+# Explicación local SHAP
 # ---------------------------------------------------------
 
-def build_heuristic_explanation(
-    vehicle: Vehicle,
-) -> list[str]:
+# Nombres legibles para las variables de entrada más frecuentes en las
+# explicaciones locales (el resto se muestra con su nombre técnico).
+_READABLE_NAMES = {
+    "model_year": "Año del modelo",
+    "odometer": "Kilometraje",
+    "odometer_per_year": "Kilometraje por año",
+    "is_4wd": "Tracción 4×4",
+    "cylinders": "Cantidad de cilindros",
+    "condition_ord": "Condición del vehículo",
+    "days_listed": "Días de publicación",
+}
+
+
+def build_shap_explanation(
+    features: pd.DataFrame,
+    predicted_segment: str,
+    top_n: int = 5,
+) -> list[dict]:
     """
-    Genera una orientación descriptiva sobre los atributos ingresados.
+    Genera una explicación LOCAL para la predicción actual, calculada
+    directamente sobre el Random Forest final (mismo objeto que
+    produce la predicción, no un modelo sustituto).
 
-    Las reglas se basan en variables relevantes observadas durante el
-    análisis exploratorio y el análisis SHAP global. No corresponden a
-    valores SHAP locales ni explican matemáticamente la predicción
-    individual del clasificador.
+    Devuelve las variables con mayor contribución SHAP para la clase
+    predicha, indicando si empujaron la predicción hacia esa clase
+    (contribución positiva) o en contra (contribución negativa).
     """
 
-    age = REF_YEAR - vehicle.model_year
-    notes = []
+    transformed = _PREPROCESSOR.transform(features)
 
-    if age <= 4:
-        notes.append(
-            "Año reciente: atributo generalmente asociado "
-            "con segmentos de mayor precio."
-        )
-    elif age >= 12:
-        notes.append(
-            "Mayor antigüedad: atributo generalmente asociado "
-            "con segmentos de menor precio."
-        )
+    if hasattr(transformed, "toarray"):
+        transformed = transformed.toarray()
 
-    if vehicle.odometer <= 60000:
-        notes.append(
-            "Kilometraje bajo: factor habitualmente asociado "
-            "con un mayor valor."
-        )
-    elif vehicle.odometer >= 160000:
-        notes.append(
-            "Kilometraje alto: factor habitualmente asociado "
-            "con un menor valor."
-        )
+    class_index = list(_CLASSIFIER.classes_).index(predicted_segment)
 
-    if vehicle.is_4wd:
-        notes.append(
-            "Tracción 4×4: característica asociada con un "
-            "mayor valor en el conjunto analizado."
-        )
+    shap_values = _EXPLAINER.shap_values(
+        transformed,
+        check_additivity=False,
+    )
 
-    if vehicle.cylinders >= 8:
-        notes.append(
-            "Motor de ocho o más cilindros: característica "
-            "frecuente en segmentos de mayor precio."
-        )
-    elif vehicle.cylinders <= 4:
-        notes.append(
-            "Motor de cuatro o menos cilindros: característica "
-            "frecuente en segmentos económicos."
-        )
+    values_for_class = (
+        shap_values[:, :, class_index]
+        if not isinstance(shap_values, list)
+        else shap_values[class_index]
+    )
 
-    if vehicle.type in (
-        "truck",
-        "pickup",
-    ):
-        notes.append(
-            "Carrocería truck/pickup: categoría asociada con "
-            "segmentos de mayor precio en este mercado."
-        )
+    contributions = pd.Series(
+        values_for_class[0],
+        index=_FEATURE_NAMES,
+    )
 
-    if not notes:
-        notes.append(
-            "La combinación ingresada no activa ninguna de las "
-            "reglas descriptivas principales."
-        )
+    top = contributions.reindex(
+        contributions.abs().sort_values(ascending=False).index
+    ).head(top_n)
 
-    return notes
+    explanation = []
+
+    for feature_name, shap_value in top.items():
+        direction = "a favor" if shap_value > 0 else "en contra"
+        explanation.append({
+            "variable": _READABLE_NAMES.get(feature_name, feature_name),
+            "shap_value": round(float(shap_value), 4),
+            "direccion": direction,
+        })
+
+    return explanation
 
 
 # ---------------------------------------------------------
@@ -394,14 +406,17 @@ def predict(vehicle: Vehicle):
         )
     }
 
+    explanation = build_shap_explanation(
+        features,
+        predicted_segment,
+    )
+
     return {
         "segment": predicted_segment,
         "probabilities": probability_by_class,
         "probabilities_calibrated": False,
-        "explanation": build_heuristic_explanation(
-            vehicle
-        ),
-        "explanation_type": "heuristic",
+        "explanation": explanation,
+        "explanation_type": "shap_local",
         "latency_ms": round(
             latency_ms,
             2,
@@ -470,5 +485,5 @@ def health():
         "model_loaded": model is not None,
         "classes": SEG_LABELS,
         "probabilities_calibrated": False,
-        "explanation_type": "heuristic",
+        "explanation_type": "shap_local",
     }
