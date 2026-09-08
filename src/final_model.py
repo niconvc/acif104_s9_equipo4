@@ -50,11 +50,22 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-from preprocessing import SEG_LABELS
-from train_ml import (
-    build_preprocessor,
-    get_splits,
-)
+from preprocessing import SEG_LABELS, NUMERIC_FEATURES, CATEGORICAL_FEATURES
+from train_ml import get_splits
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+# 'age' se excluye por ser redundante con 'model_year' (age = 2019 - model_year).
+# La verificación empírica (feature_redundancy_check.py) muestra que esta
+# exclusion no afecta el desempeño (variacion de F1-macro = 0.001).
+FINAL_NUMERIC_FEATURES = [f for f in NUMERIC_FEATURES if f != 'age']
+
+
+def build_preprocessor():
+    return ColumnTransformer([
+        ('num', StandardScaler(), FINAL_NUMERIC_FEATURES),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), CATEGORICAL_FEATURES),
+    ])
 
 
 # ---------------------------------------------------------
