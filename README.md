@@ -1,5 +1,19 @@
 # Clasificador de Segmento de Precio de Vehículos Usados
 
+## Actualización — Cierre de brechas (Informe Final / Sumativa 3)
+
+A partir de la retroalimentación docente sobre la Sumativa 2, se implementaron y verificaron con evidencia empírica las siguientes correcciones (detalladas en el informe final, secciones III.3.3.1, III.3.7 y III.3.8):
+
+- **Comparación homogénea de balanceo**: se reejecutó la comparación ML/DL aplicando SMOTE de forma uniforme (sin `class_weight` mixto) a las cinco técnicas comparables. Random Forest se mantiene como la mejor (F1-macro 0,848). Ver `src/homogeneous_comparison.py`.
+- **Eliminación de la variable redundante `age`**: se verificó que `age` (= 2019 − `model_year`) no aporta información adicional; el modelo final ahora excluye esta variable, sin costo de desempeño. Ver `src/feature_redundancy_check.py`.
+- **SHAP sobre el modelo final real**: el análisis de explicabilidad ya no usa un modelo sustituto; se calcula directamente sobre el Random Forest de 200 árboles serializado en `models/final_model.joblib`. Ver `src/explain.py` (reescrito).
+- **Explicaciones locales reales en la API**: `backend/app.py` ahora calcula, en cada solicitud a `/predict`, la atribución SHAP local de esa predicción específica (campo `explanation_type: "shap_local"`), reemplazando las reglas heurísticas usadas hasta la Sumativa 2. El frontend se actualizó en consecuencia.
+- **EarlyStopping**: se verificó que la corrección (instancia independiente por modelo) ya estaba correctamente implementada; no requirió cambios.
+
+Métricas actualizadas del modelo final (sin `age`): **Accuracy 0,860 · F1-macro 0,849 · AUC-OVR macro 0,953**.
+
+---
+
 Proyecto de Aprendizaje de Máquinas correspondiente a la tercera fase del proyecto. La solución clasifica vehículos usados en tres segmentos de precio —**Económico**, **Medio** y **Premium**— utilizando sus características técnicas y comerciales.
 
 La pregunta que orienta el proyecto es:
@@ -105,8 +119,7 @@ acif104_s9_equipo4/
 ├── data/
 │   └── vehicles_us.csv
 ├── docs/
-│   ├── acif104_s9_equipo4.pdf
-│   └── demostracion_sistema_funcional.mp4
+│   └── acif104_s9_equipo4.pdf
 ├── frontend/
 │   └── index.html
 ├── models/
@@ -503,21 +516,11 @@ El endpoint `/metrics` registra durante la ejecución:
 
 Estas métricas se mantienen en memoria y se reinician al detener o reiniciar el servidor.
 
-## Documentación y demostración
+## Documentación
 
 La carpeta [`docs/`](docs/) contiene los siguientes archivos:
 
-- [`acif104_s9_equipo4.pdf`](docs/acif104_s9_equipo4.pdf): informe final de la Sumativa 2.
-- [`demostracion_sistema_funcional.mp4`](docs/demostracion_sistema_funcional.mp4): evidencia audiovisual de la operación del sistema web.
-
-El video presenta:
-
-- El funcionamiento general de la interfaz.
-- Predicciones para los segmentos Económico, Medio y Premium.
-- Las probabilidades estimadas para cada clase.
-- Las orientaciones heurísticas.
-- La actualización del panel de monitoreo.
-- La validación de datos fuera de rango.
+- [`acif104_s9_equipo4.pdf`](docs/acif104_s9_equipo4.pdf): informe de la fase intermedia del proyecto.
 
 ## Evidencias reproducibles
 
@@ -534,8 +537,7 @@ El video presenta:
 | SHAP global | `reports/figures/shap_global.png` |
 | SHAP por clase | `reports/figures/shap_por_clase.png` |
 | Interfaz web | `reports/figures/ui_prediccion.png` |
-| Demostración audiovisual | `docs/demostracion_sistema_funcional.mp4` |
-| Informe final | `docs/acif104_s9_equipo4.pdf` |
+| Informe fase intermedia | `docs/acif104_s9_equipo4.pdf` |
 
 ## Consideraciones y limitaciones
 
