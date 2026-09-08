@@ -574,9 +574,9 @@
   </main>
 
   <footer>
-    Fase 3 — Modelo Random Forest + SMOTE
-    (F1-macro 0,846 en test) · Probabilidades no calibradas ·
-    Orientación heurística.
+    Informe final — Modelo Random Forest + SMOTE, sin variable
+    redundante age (F1-macro 0,849 en test) · Probabilidades no
+    calibradas · Explicación local SHAP sobre el modelo final.
   </footer>
 
   <script>
@@ -966,7 +966,11 @@
         data.explanation || []
       )
         .map(
-          (item) => `<li>${item}</li>`
+          (item) => {
+            const sign = item.shap_value > 0 ? "+" : "";
+            return `<li>${item.variable}: ${item.direccion} ` +
+              `(SHAP ${sign}${item.shap_value})</li>`;
+          }
         )
         .join("");
 
@@ -994,7 +998,7 @@
 
         <div class="orientation">
           <h3>
-            Orientación sobre los atributos
+            Explicación local de la predicción (SHAP)
           </h3>
 
           <ul>
@@ -1002,9 +1006,12 @@
           </ul>
 
           <p class="explanation-note">
-            Estas observaciones son reglas descriptivas y no
-            atribuciones SHAP locales de esta predicción.
-            Las probabilidades presentadas no han sido calibradas.
+            Estas contribuciones se calculan con SHAP directamente
+            sobre el modelo final (Random Forest + SMOTE) que generó
+            esta predicción. Un valor SHAP positivo empuja hacia el
+            segmento predicho; uno negativo, en contra. No deben
+            interpretarse como relaciones causales, y las
+            probabilidades presentadas no han sido calibradas.
           </p>
         </div>
       `;
