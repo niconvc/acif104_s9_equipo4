@@ -1,23 +1,8 @@
 # Clasificador de Segmento de Precio de Vehículos Usados
 
-## Actualización — Cierre de brechas (Informe Final / Sumativa 3)
-
-A partir de la retroalimentación docente sobre la Sumativa 2, se implementaron y verificaron con evidencia empírica las siguientes correcciones (detalladas en el informe final, secciones III.3.3.1, III.3.7 y III.3.8):
-
-- **Comparación homogénea de balanceo**: se reejecutó la comparación ML/DL aplicando SMOTE de forma uniforme (sin `class_weight` mixto) a las cinco técnicas comparables. Random Forest se mantiene como la mejor (F1-macro 0,848). Ver `src/homogeneous_comparison.py`.
-- **Eliminación de la variable redundante `age`**: se verificó que `age` (= 2019 − `model_year`) no aporta información adicional; el modelo final ahora excluye esta variable, sin costo de desempeño. Ver `src/feature_redundancy_check.py`.
-- **SHAP sobre el modelo final real**: el análisis de explicabilidad ya no usa un modelo sustituto; se calcula directamente sobre el Random Forest de 200 árboles serializado en `models/final_model.joblib`. Ver `src/explain.py` (reescrito).
-- **Explicaciones locales reales en la API**: `backend/app.py` ahora calcula, en cada solicitud a `/predict`, la atribución SHAP local de esa predicción específica (campo `explanation_type: "shap_local"`), reemplazando las reglas heurísticas usadas hasta la Sumativa 2. El frontend se actualizó en consecuencia.
-- **EarlyStopping**: se verificó que la corrección (instancia independiente por modelo) ya estaba correctamente implementada; no requirió cambios.
-
-Métricas actualizadas del modelo final (sin `age`): **Accuracy 0,860 · F1-macro 0,849 · AUC-OVR macro 0,953**.
-
----
-
-Proyecto de Aprendizaje de Máquinas correspondiente a la tercera fase del proyecto. La solución clasifica vehículos usados en tres segmentos de precio —**Económico**, **Medio** y **Premium**— utilizando sus características técnicas y comerciales.
+Proyecto de Aprendizaje de Máquinas. La solución clasifica vehículos usados en tres segmentos de precio —**Económico**, **Medio** y **Premium**— utilizando sus características técnicas y comerciales.
 
 La pregunta que orienta el proyecto es:
-
 > ¿Qué características de un vehículo usado permiten clasificarlo en un segmento de precio y qué estrategia de modelado ofrece el mejor equilibrio de desempeño entre las tres clases?
 
 ## Integrantes
@@ -31,19 +16,19 @@ La pregunta que orienta el proyecto es:
 
 A partir del dataset `vehicles_us.csv`, el proyecto formula una tarea de clasificación multiclase. La variable objetivo se construye utilizando los siguientes umbrales:
 
-| Segmento | Definición |
-|---|---|
-| Económico | Precio inferior a USD 5.000 |
-| Medio | Precio entre USD 5.000 y USD 20.000 |
-| Premium | Precio superior a USD 20.000 |
+| Segmento  | Definición                          |
+| --------- | ------------------------------------ |
+| Económico | Precio inferior a USD 5.000          |
+| Medio     | Precio entre USD 5.000 y USD 20.000  |
+| Premium   | Precio superior a USD 20.000         |
 
 Después del proceso de limpieza, el conjunto utilizado para el modelado contiene **50.267 vehículos**, distribuidos de la siguiente manera:
 
-| Segmento | Cantidad | Porcentaje |
-|---|---:|---:|
-| Económico | 11.746 | 23,4 % |
-| Medio | 29.856 | 59,4 % |
-| Premium | 8.665 | 17,2 % |
+| Segmento  | Cantidad   | Porcentaje  |
+| --------- | ---------- | ----------- |
+| Económico | 11.746     | 23,4 %      |
+| Medio     | 29.856     | 59,4 %      |
+| Premium   | 8.665      | 17,2 %      |
 | **Total** | **50.267** | **100,0 %** |
 
 Esta distribución presenta un desbalance relevante, principalmente por el predominio de la clase Medio. Por esta razón, la métrica principal del proyecto es el **F1-macro**, complementada con accuracy, precisión, recall por clase y AUC multiclase One-vs-Rest con promedio macro.
@@ -52,7 +37,7 @@ Esta distribución presenta un desbalance relevante, principalmente por el predo
 
 El modelo seleccionado es un pipeline compuesto por:
 
-1. Preprocesamiento de variables numéricas y categóricas.
+1. Preprocesamiento de variables numéricas y categóricas (sin la variable `age`, redundante con `model_year`).
 2. Balanceo de clases mediante SMOTE.
 3. Clasificación mediante Random Forest de 200 árboles.
 
@@ -60,59 +45,70 @@ El modelo se entrenó utilizando los conjuntos de entrenamiento y validación y 
 
 ### Resultados por segmento
 
-| Segmento | Precisión | Recall | F1-score | Soporte |
-|---|---:|---:|---:|---:|
-| Económico | 0,796 | 0,780 | 0,788 | 1.762 |
-| Medio | 0,879 | 0,885 | 0,882 | 4.479 |
-| Premium | 0,868 | 0,872 | 0,870 | 1.300 |
-| Global (macro) | 0,847 | 0,845 | 0,846 | — |
+| Segmento       | Precisión | Recall | F1-score | Soporte |
+| -------------- | --------- | ------ | -------- | ------- |
+| Económico      | 0,797     | 0,791  | 0,794    | 1.762   |
+| Medio          | 0,883     | 0,883  | 0,883    | 4.479   |
+| Premium        | 0,866     | 0,875  | 0,871    | 1.300   |
+| Global (macro) | 0,849     | 0,850  | 0,849    | —       |
 
 ### Resultados globales
 
-- **Accuracy:** 0,858.
-- **F1-macro:** 0,846.
+- **Accuracy:** 0,860.
+- **F1-macro:** 0,849.
 - **AUC-OVR macro:** 0,953.
 - **Casos de test:** 7.541.
-- **Tamaño comprimido del modelo:** aproximadamente 63,1 MB.
+- **Tamaño comprimido del modelo:** aproximadamente 66,3 MB.
 
 El AUC-OVR macro de 0,953 evidencia una alta capacidad del modelo para discriminar cada segmento frente a los restantes mediante las probabilidades estimadas. Sin embargo, las probabilidades no han sido sometidas a un procedimiento específico de calibración, por lo que deben interpretarse como estimaciones orientativas y no como niveles de confianza perfectamente calibrados.
 
 Las métricas corresponden al dataset y al mercado analizado, por lo que no garantizan el mismo desempeño en otros países, periodos, plataformas o fuentes de información.
 
+## Comparación de técnicas bajo un protocolo homogéneo
+
+Además de la comparación exploratoria inicial entre Regresión Logística, Random Forest, XGBoost y tres arquitecturas de Deep Learning, se realizó una segunda comparación aplicando SMOTE de forma **uniforme** (sin mezclar `class_weight`) sobre las cinco técnicas cuya representación de entrada es compatible con el remuestreo sintético:
+
+| Modelo               | Accuracy | F1-macro |
+| --------------------- | -------- | -------- |
+| Regresión Logística    | 0,767    | 0,759    |
+| Random Forest          | 0,860    | 0,848    |
+| XGBoost                | 0,846    | 0,831    |
+| MLP Shallow            | 0,806    | 0,797    |
+| MLP Profunda           | 0,803    | 0,796    |
+
+Random Forest se mantiene como la técnica de mejor desempeño bajo este protocolo controlado. Ver `src/homogeneous_comparison.py` y `reports/homogeneous_comparison_results.csv`.
+
+(La arquitectura MLP con Embeddings queda fuera de esta comparación específica porque sus variables categóricas se representan como índices enteros, no como vectores one-hot, y SMOTE no puede generar índices sintéticos categóricos válidos.)
+
 ## Matriz de confusión
 
 | Segmento real | Económico | Medio | Premium |
-|---|---:|---:|---:|
-| Económico | 1.375 | 381 | 6 |
-| Medio | 350 | 3.962 | 167 |
-| Premium | 3 | 164 | 1.133 |
+| ------------- | --------- | ----- | ------- |
+| Económico     | 1.393     | 365   | 4       |
+| Medio         | 351       | 3.956 | 172     |
+| Premium       | 3         | 159   | 1.138   |
 
-La mayoría de los errores ocurre entre segmentos vecinos. Las confusiones extremas entre Económico y Premium suman nueve casos al considerar ambas direcciones.
+La mayoría de los errores ocurre entre segmentos vecinos. Las confusiones extremas entre Económico y Premium suman solo siete casos al considerar ambas direcciones.
 
-## Explicabilidad y alcance
+## Explicabilidad
 
-El análisis de explicabilidad global utiliza SHAP sobre un Random Forest sustituto de 120 árboles y profundidad máxima 14. Este modelo compacto permite reducir el costo computacional del análisis, pero no corresponde exactamente al modelo final utilizado por la API.
+El análisis de explicabilidad (global y local) se calcula directamente sobre el Random Forest final de 200 árboles —el mismo objeto serializado en `models/final_model.joblib` que expone la API—, sin modelo sustituto de por medio.
 
-Las variables globalmente más relevantes incluyen:
+Las variables globalmente más relevantes son:
 
-- Año del modelo.
-- Antigüedad.
-- Kilometraje.
-- Tracción 4×4.
-- Cantidad de cilindros.
-- Tipo de carrocería.
+1. `model_year` (año del modelo)
+2. `odometer` (kilometraje)
+3. `is_4wd` (tracción 4×4)
+4. `cylinders` (cantidad de cilindros)
+5. `condition_ord` (condición del vehículo)
 
-Las variables `model_year` y `age` contienen información redundante, debido a que:
+Al no incluir la variable `age` (redundante con `model_year`, ya que `age = 2019 - model_year`), el ranking de importancia no reparte artificialmente el crédito de la antigüedad del vehículo entre dos columnas equivalentes.
 
-```text
-age = 2019 - model_year
-```
-
-La aplicación web no calcula SHAP por instancia. La interfaz presenta una **orientación heurística** basada en variables relevantes identificadas mediante el análisis exploratorio y el análisis SHAP global. Estas orientaciones no corresponden a atribuciones locales del clasificador.
+**Explicación local en la API.** Cada respuesta del endpoint `/predict` incluye además una explicación calculada en el momento de la solicitud, mediante `shap.TreeExplainer`, sobre la predicción específica de ese vehículo. Esto añade aproximadamente 2,6 segundos de latencia por solicitud (el explicador se construye una sola vez al iniciar la aplicación, pero el cálculo de valores de Shapley sobre un bosque de 200 árboles sigue siendo el paso más costoso).
 
 ## Estructura del repositorio
 
-```text
+```
 acif104_s9_equipo4/
 ├── backend/
 │   └── app.py
@@ -129,6 +125,7 @@ acif104_s9_equipo4/
 │   ├── figures/
 │   │   ├── Figura1_eda_overview.png
 │   │   ├── comparacion_modelos.png
+│   │   ├── comparacion_homogenea.png
 │   │   ├── confusion_matrix.png
 │   │   ├── convergencia_dl.png
 │   │   ├── efecto_balanceo.png
@@ -138,12 +135,16 @@ acif104_s9_equipo4/
 │   ├── balancing_results.csv
 │   ├── confusion_matrix.csv
 │   ├── final_model_results.csv
-│   └── rf_refinement_results.csv
+│   ├── rf_refinement_results.csv
+│   ├── homogeneous_comparison_results.csv
+│   └── feature_redundancy_results.csv
 ├── src/
 │   ├── balancing.py
 │   ├── eda.py
 │   ├── explain.py
+│   ├── feature_redundancy_check.py
 │   ├── final_model.py
+│   ├── homogeneous_comparison.py
 │   ├── preprocessing.py
 │   ├── rf_refinement.py
 │   ├── train_dl.py
@@ -158,18 +159,20 @@ El archivo `models/final_model.joblib` no se publica en GitHub debido a su tama�
 
 ## Responsabilidad de cada script
 
-| Archivo | Descripción |
-|---|---|
-| `preprocessing.py` | Limpieza, imputación, ingeniería de características y construcción de la variable objetivo |
-| `eda.py` | Análisis exploratorio reproducible y generación de la Figura 1 |
-| `train_ml.py` | Comparación de Regresión Logística, Random Forest y XGBoost |
-| `train_dl.py` | Entrenamiento de tres arquitecturas MLP |
-| `balancing.py` | Comparación de datos sin balanceo, class weights, SMOTE y submuestreo |
-| `rf_refinement.py` | Barrido de cantidad de árboles y profundidad del Random Forest |
-| `final_model.py` | Entrenamiento y evaluación final; genera precisión, recall, F1-score, accuracy, AUC-OVR macro, matriz de confusión y modelo serializado |
-| `explain.py` | Análisis SHAP global sobre un Random Forest sustituto |
-| `backend/app.py` | API FastAPI para predicción, validación, monitoreo y orientación heurística |
-| `frontend/index.html` | Interfaz web para ingresar datos, visualizar predicciones y consultar métricas |
+| Archivo                          | Descripción                                                                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `preprocessing.py`                | Limpieza, imputación, ingeniería de características y construcción de la variable objetivo                                               |
+| `eda.py`                          | Análisis exploratorio reproducible y generación de la Figura 1                                                                            |
+| `train_ml.py`                     | Comparación de Regresión Logística, Random Forest y XGBoost                                                                               |
+| `train_dl.py`                     | Entrenamiento de tres arquitecturas MLP                                                                                                   |
+| `balancing.py`                    | Comparación de datos sin balanceo, class weights, SMOTE y submuestreo (sobre Random Forest)                                               |
+| `rf_refinement.py`                | Barrido de cantidad de árboles y profundidad del Random Forest                                                                            |
+| `homogeneous_comparison.py`       | Reejecuta la comparación ML/DL aplicando SMOTE de forma homogénea a las cinco técnicas comparables                                        |
+| `feature_redundancy_check.py`     | Compara el modelo final con y sin la variable `age`                                                                                       |
+| `final_model.py`                  | Entrenamiento y evaluación final (sin `age`); genera precisión, recall, F1-score, accuracy, AUC-OVR macro, matriz de confusión y el modelo serializado |
+| `explain.py`                      | Análisis SHAP global y local sobre el Random Forest final real (sin modelo sustituto)                                                     |
+| `backend/app.py`                  | API FastAPI para predicción, validación, monitoreo y explicación local SHAP en cada respuesta                                             |
+| `frontend/index.html`             | Interfaz web para ingresar datos, visualizar predicciones y consultar la explicación local de cada una                                    |
 
 ## Requisitos
 
@@ -178,13 +181,13 @@ El archivo `models/final_model.joblib` no se publica en GitHub debido a su tama�
 - Windows, Linux o macOS.
 - Python 3.12 recomendado.
 - `pip` actualizado.
-- Memoria suficiente para entrenar Random Forest y aplicar SMOTE.
+- Memoria suficiente para entrenar Random Forest, aplicar SMOTE y calcular SHAP.
 
 Las dependencias principales están declaradas en `requirements.txt`.
 
 ### Deep Learning
 
-Para ejecutar `src/train_dl.py` se requiere TensorFlow. Las dependencias adicionales están declaradas en `requirements-dl.txt`.
+Para ejecutar `src/train_dl.py` o `src/homogeneous_comparison.py` se requiere TensorFlow. Las dependencias adicionales están declaradas en `requirements-dl.txt`.
 
 En Windows se recomienda utilizar Python 3.12 para mantener compatibilidad con TensorFlow.
 
@@ -192,7 +195,7 @@ En Windows se recomienda utilizar Python 3.12 para mantener compatibilidad con T
 
 ### 1. Clonar el repositorio
 
-```bash
+```
 git clone https://github.com/niconvc/acif104_s9_equipo4.git
 cd acif104_s9_equipo4
 ```
@@ -201,48 +204,48 @@ cd acif104_s9_equipo4
 
 #### Windows PowerShell
 
-```powershell
+```
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
 Si PowerShell bloquea temporalmente la activación:
 
-```powershell
+```
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
 #### Linux o macOS
 
-```bash
+```
 python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
 ### 3. Actualizar pip
 
-```bash
+```
 python -m pip install --upgrade pip
 ```
 
 ### 4. Instalar las dependencias principales
 
-```bash
+```
 python -m pip install -r requirements.txt
 ```
 
 ### 5. Instalar las dependencias de Deep Learning
 
-Este paso solo es necesario para ejecutar `src/train_dl.py`:
+Este paso solo es necesario para ejecutar `src/train_dl.py` o `src/homogeneous_comparison.py`:
 
-```bash
+```
 python -m pip install -r requirements-dl.txt
 ```
 
 El archivo `requirements-dl.txt` incluye las dependencias principales y TensorFlow:
 
-```text
+```
 -r requirements.txt
 tensorflow==2.21.0
 ```
@@ -251,19 +254,19 @@ tensorflow==2.21.0
 
 Todos los comandos deben ejecutarse desde la carpeta raíz del repositorio:
 
-```text
+```
 acif104_s9_equipo4/
 ```
 
 ### 1. Verificar el preprocesamiento
 
-```bash
+```
 python src/preprocessing.py
 ```
 
 Salida esperada:
 
-```text
+```
 Filas finales: 50267
 
 Distribución del target:
@@ -274,92 +277,77 @@ Premium       8665
 
 ### 2. Generar el análisis exploratorio
 
-```bash
+```
 python src/eda.py
 ```
 
 Archivo generado:
 
-```text
+```
 reports/figures/Figura1_eda_overview.png
 ```
 
 ### 3. Comparar modelos tradicionales
 
-```bash
+```
 python src/train_ml.py
 ```
 
-Modelos evaluados:
-
-- Regresión Logística.
-- Random Forest.
-- XGBoost.
+Modelos evaluados: Regresión Logística, Random Forest, XGBoost.
 
 ### 4. Comparar arquitecturas neuronales
 
 Este paso requiere las dependencias de `requirements-dl.txt`:
 
-```bash
+```
 python src/train_dl.py
 ```
 
-Arquitecturas evaluadas:
-
-- MLP Shallow.
-- MLP Profunda.
-- MLP con embeddings.
-
-Cada entrenamiento utiliza una instancia independiente de `EarlyStopping`, evitando que el callback conserve información de una red anterior.
+Arquitecturas evaluadas: MLP Shallow, MLP Profunda, MLP con embeddings. Cada entrenamiento utiliza una instancia independiente de `EarlyStopping`, evitando que el callback conserve información de una red anterior.
 
 ### 5. Evaluar técnicas de balanceo
 
-```bash
+```
 python src/balancing.py
 ```
 
-Archivo generado:
-
-```text
-reports/balancing_results.csv
-```
-
-Técnicas evaluadas:
-
-- Sin balanceo.
-- Class weights.
-- SMOTE.
-- RandomUnderSampler.
+Archivo generado: `reports/balancing_results.csv`. Técnicas evaluadas: sin balanceo, class weights, SMOTE, RandomUnderSampler (sobre Random Forest).
 
 ### 6. Ejecutar el refinamiento de Random Forest
 
-```bash
+```
 python src/rf_refinement.py
 ```
 
-Archivo generado:
+Archivo generado: `reports/rf_refinement_results.csv`. Configuraciones evaluadas: 100, 200 y 300 árboles; profundidad máxima 20 y sin límite.
 
-```text
-reports/rf_refinement_results.csv
+### 7. Validar la comparación homogénea de balanceo (opcional)
+
+Requiere las dependencias de `requirements-dl.txt`:
+
+```
+python src/homogeneous_comparison.py
 ```
 
-Configuraciones evaluadas:
+Archivo generado: `reports/homogeneous_comparison_results.csv`.
 
-- 100, 200 y 300 árboles.
-- Profundidad máxima de 20.
-- Profundidad sin límite.
+### 8. Validar la eliminación de la variable redundante (opcional)
 
-El script registra F1-macro, recall Premium, recall Económico, tiempo de entrenamiento y tamaño serializado.
+```
+python src/feature_redundancy_check.py
+```
 
-### 7. Entrenar y evaluar el modelo final
+Archivo generado: `reports/feature_redundancy_results.csv`.
 
-```bash
+### 9. Entrenar y evaluar el modelo final
+
+```
 python src/final_model.py
 ```
 
 Archivos generados:
 
-```text
+```
 models/final_model.joblib
 reports/final_model_results.csv
 reports/confusion_matrix.csv
@@ -368,76 +356,68 @@ reports/figures/confusion_matrix.png
 
 Salida esperada de métricas globales:
 
-```text
-Accuracy:       0.858
-F1-macro:       0.846
+```
+Accuracy:       0.860
+F1-macro:       0.849
 AUC-OVR macro:  0.953
 ```
 
-El archivo `reports/final_model_results.csv` contiene precisión, recall, F1-score, soporte, accuracy global y AUC-OVR macro.
+El modelo serializado utiliza compresión Joblib para reducir su tamaño, sin modificar sus predicciones ni métricas.
 
-El modelo serializado utiliza compresión Joblib para reducir su tamaño aproximado desde 374 MB hasta 63,1 MB, sin modificar sus predicciones ni métricas.
+### 10. Generar el análisis SHAP
 
-### 8. Generar el análisis SHAP
-
-```bash
+```
 python src/explain.py
 ```
 
 Archivos generados:
 
-```text
+```
 reports/figures/shap_global.png
 reports/figures/shap_por_clase.png
 ```
 
-El análisis utiliza un Random Forest sustituto de 120 árboles y profundidad máxima 14.
+El análisis se calcula directamente sobre el Random Forest final serializado en `models/final_model.joblib` (no sobre un modelo sustituto). Este paso puede tardar varios minutos.
 
 ## Ejecutar la aplicación web
 
-Antes de iniciar la aplicación debe existir:
+Antes de iniciar la aplicación debe existir `models/final_model.joblib`. Si no existe, genéralo desde la raíz:
 
-```text
-models/final_model.joblib
 ```
-
-Si el archivo no existe, debe generarse desde la raíz:
-
-```bash
 python src/final_model.py
 ```
 
 Después, inicia FastAPI con Uvicorn:
 
-```bash
+```
 python -m uvicorn backend.app:app
 ```
 
 Para desarrollo con recarga automática:
 
-```bash
+```
 python -m uvicorn backend.app:app --reload
 ```
 
 Abre en el navegador:
 
-```text
+```
 http://127.0.0.1:8000
 ```
 
 ## Endpoints de la API
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/` | Muestra la interfaz web |
-| `POST` | `/predict` | Predice el segmento y devuelve probabilidades estimadas y orientación heurística |
-| `GET` | `/metrics` | Devuelve métricas básicas de uso, distribución y latencia |
-| `GET` | `/health` | Informa el estado del servicio y del modelo |
-| `GET` | `/docs` | Muestra la documentación interactiva de FastAPI |
+| Método | Ruta       | Descripción                                                                    |
+| ------ | ---------- | ------------------------------------------------------------------------------- |
+| `GET`  | `/`        | Muestra la interfaz web                                                        |
+| `POST` | `/predict` | Predice el segmento y devuelve probabilidades estimadas y explicación local SHAP |
+| `GET`  | `/metrics` | Devuelve métricas básicas de uso, distribución y latencia                       |
+| `GET`  | `/health`  | Informa el estado del servicio y del modelo                                     |
+| `GET`  | `/docs`    | Muestra la documentación interactiva de FastAPI                                 |
 
 ## Ejemplo de solicitud
 
-```json
+```
 {
   "model_year": 2019,
   "odometer": 25000,
@@ -455,22 +435,24 @@ http://127.0.0.1:8000
 
 ## Ejemplo de respuesta
 
-```json
+```
 {
   "segment": "Premium",
   "probabilities": {
     "Económico": 0.0,
-    "Medio": 0.02,
-    "Premium": 0.98
+    "Medio": 0.0,
+    "Premium": 1.0
   },
   "probabilities_calibrated": false,
   "explanation": [
-    "Año reciente: atributo generalmente asociado con segmentos de mayor precio.",
-    "Kilometraje bajo: factor habitualmente asociado con un mayor valor.",
-    "Tracción 4×4: característica asociada con un mayor valor en el conjunto analizado."
+    {"variable": "Año del modelo", "shap_value": 0.2396, "direccion": "a favor"},
+    {"variable": "Kilometraje", "shap_value": 0.1682, "direccion": "a favor"},
+    {"variable": "Tracción 4×4", "shap_value": 0.0616, "direccion": "a favor"},
+    {"variable": "Cantidad de cilindros", "shap_value": 0.0599, "direccion": "a favor"},
+    {"variable": "type_truck", "shap_value": 0.0564, "direccion": "a favor"}
   ],
-  "explanation_type": "heuristic",
-  "latency_ms": 53.0
+  "explanation_type": "shap_local",
+  "latency_ms": 2580.0
 }
 ```
 
@@ -480,83 +462,71 @@ Los valores de probabilidad y latencia pueden variar entre ejecuciones y equipos
 
 ### Estado de la API
 
-```text
+```
 http://127.0.0.1:8000/health
 ```
 
 Respuesta esperada:
 
-```json
+```
 {
   "status": "ok",
   "model_loaded": true,
-  "classes": [
-    "Económico",
-    "Medio",
-    "Premium"
-  ],
+  "classes": ["Económico", "Medio", "Premium"],
   "probabilities_calibrated": false,
-  "explanation_type": "heuristic"
+  "explanation_type": "shap_local"
 }
 ```
 
 ### Monitoreo
 
-```text
+```
 http://127.0.0.1:8000/metrics
 ```
 
-El endpoint `/metrics` registra durante la ejecución:
-
-- Número total de predicciones.
-- Distribución de predicciones por segmento.
-- Latencia media.
-- Latencia p95.
-- Predicciones recientes.
-
-Estas métricas se mantienen en memoria y se reinician al detener o reiniciar el servidor.
+El endpoint `/metrics` registra durante la ejecución: número total de predicciones, distribución de predicciones por segmento, latencia media, latencia p95 y predicciones recientes. Estas métricas se mantienen en memoria y se reinician al detener o reiniciar el servidor.
 
 ## Documentación
 
-La carpeta [`docs/`](docs/) contiene los siguientes archivos:
+La carpeta [`docs/`](docs/) contiene:
 
 - [`acif104_s9_equipo4.pdf`](docs/acif104_s9_equipo4.pdf): informe de la fase intermedia del proyecto.
 
 ## Evidencias reproducibles
 
-| Evidencia | Archivo |
-|---|---|
-| EDA y distribución del target | `reports/figures/Figura1_eda_overview.png` |
-| Comparación de modelos | `reports/figures/comparacion_modelos.png` |
-| Convergencia de redes neuronales | `reports/figures/convergencia_dl.png` |
-| Efecto del balanceo | `reports/figures/efecto_balanceo.png` |
-| Barrido de Random Forest | `reports/rf_refinement_results.csv` |
-| Métricas finales, incluida AUC-OVR macro | `reports/final_model_results.csv` |
-| Matriz de confusión en CSV | `reports/confusion_matrix.csv` |
-| Figura de matriz de confusión | `reports/figures/confusion_matrix.png` |
-| SHAP global | `reports/figures/shap_global.png` |
-| SHAP por clase | `reports/figures/shap_por_clase.png` |
-| Interfaz web | `reports/figures/ui_prediccion.png` |
-| Informe fase intermedia | `docs/acif104_s9_equipo4.pdf` |
+| Evidencia                                     | Archivo                                              |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| EDA y distribución del target                  | `reports/figures/Figura1_eda_overview.png`            |
+| Comparación de modelos (protocolo exploratorio)| `reports/figures/comparacion_modelos.png`             |
+| Comparación de modelos (protocolo homogéneo)   | `reports/figures/comparacion_homogenea.png`           |
+| Convergencia de redes neuronales               | `reports/figures/convergencia_dl.png`                 |
+| Efecto del balanceo                            | `reports/figures/efecto_balanceo.png`                 |
+| Barrido de Random Forest                       | `reports/rf_refinement_results.csv`                   |
+| Comparación homogénea ML/DL                    | `reports/homogeneous_comparison_results.csv`          |
+| Efecto de eliminar la variable `age`           | `reports/feature_redundancy_results.csv`              |
+| Métricas finales, incluida AUC-OVR macro       | `reports/final_model_results.csv`                     |
+| Matriz de confusión en CSV                     | `reports/confusion_matrix.csv`                        |
+| Figura de matriz de confusión                  | `reports/figures/confusion_matrix.png`                |
+| SHAP global (modelo final real)                | `reports/figures/shap_global.png`                     |
+| SHAP por clase (modelo final real)             | `reports/figures/shap_por_clase.png`                  |
+| Interfaz web                                   | `reports/figures/ui_prediccion.png`                   |
+| Informe fase intermedia                        | `docs/acif104_s9_equipo4.pdf`                         |
 
 ## Consideraciones y limitaciones
 
 - El dataset corresponde al mercado estadounidense y a publicaciones realizadas entre 2018 y 2019.
 - Los umbrales de USD 5.000 y USD 20.000 son fijos y no se ajustan automáticamente por inflación.
-- Las probabilidades del Random Forest no han sido calibradas.
-- Un AUC elevado indica una alta capacidad de discriminación, pero no garantiza que las probabilidades estén correctamente calibradas.
-- El análisis SHAP utiliza un modelo sustituto y no exactamente el pipeline utilizado por la API.
-- La interfaz entrega reglas descriptivas y no atribuciones SHAP locales.
-- `model_year` y `age` contienen información redundante.
-- La comparación inicial no utiliza el mismo mecanismo de balanceo para todas las técnicas.
-- Los tiempos de entrenamiento de las arquitecturas neuronales no fueron instrumentados.
+- Las probabilidades del Random Forest no han sido calibradas. Un AUC elevado indica alta capacidad de discriminación, pero no garantiza probabilidades calibradas.
+- La comparación de técnicas de balanceo con recall por clase (sección `balancing.py`) se realizó únicamente sobre Random Forest.
+- Los tiempos de entrenamiento de las arquitecturas neuronales no fueron instrumentados de forma comparable con los modelos clásicos.
+- El cálculo de SHAP local en tiempo de solicitud añade aproximadamente 2,6 segundos de latencia por predicción; para un servicio con mayor volumen de solicitudes concurrentes, esto debe optimizarse antes de un despliegue productivo real.
 - Los resultados pueden variar ligeramente entre versiones de Python, sistemas operativos y bibliotecas.
 
 ## Archivos excluidos de Git
 
 El archivo `.gitignore` excluye:
 
-```text
+```
 .venv/
 venv/
 __pycache__/
@@ -574,10 +544,10 @@ Desktop.ini
 
 El modelo final debe regenerarse localmente mediante:
 
-```bash
+```
 python src/final_model.py
 ```
 
 ## Repositorio
 
-[https://github.com/niconvc/acif104_s9_equipo4](https://github.com/niconvc/acif104_s9_equipo4)
+<https://github.com/niconvc/acif104_s9_equipo4>
