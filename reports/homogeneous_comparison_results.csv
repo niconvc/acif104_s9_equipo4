@@ -1,0 +1,6 @@
+﻿modelo,accuracy,f1_macro
+Regresión Logística,0.767,0.759
+Random Forest,0.86,0.848
+XGBoost,0.846,0.831
+MLP Shallow,0.806,0.797
+MLP Profunda,0.803,0.796
